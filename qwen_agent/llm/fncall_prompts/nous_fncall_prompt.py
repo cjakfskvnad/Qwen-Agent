@@ -4,7 +4,7 @@ from typing import List, Literal, Union
 
 from qwen_agent.llm.fncall_prompts.base_fncall_prompt import BaseFnCallPrompt
 from qwen_agent.llm.schema import ASSISTANT, FUNCTION, SYSTEM, USER, ContentItem, FunctionCall, Message
-
+from open_r1.vlm_modules import VLMBaseModule
 
 class NousFnCallPrompt(BaseFnCallPrompt):
 
@@ -15,6 +15,7 @@ class NousFnCallPrompt(BaseFnCallPrompt):
         lang: Literal['en', 'zh'],
         parallel_function_calls: bool = True,
         function_choice: Union[Literal['auto'], str] = 'auto',
+        vlm_module: VLMBaseModule = None,
     ) -> List[Message]:
         del lang  # ignored
         del parallel_function_calls  # ignored
@@ -55,14 +56,21 @@ class NousFnCallPrompt(BaseFnCallPrompt):
                     messages.append(Message(role=USER, content=content))
             else:
                 raise TypeError
-
-        tool_descs = [{'type': 'function', 'function': f} for f in functions]
-        tool_descs = '\n'.join([json.dumps(f, ensure_ascii=False) for f in tool_descs])
-        tool_system = FN_CALL_TEMPLATE.format(tool_descs=tool_descs)
-        if messages[0].role == SYSTEM:
-            messages[0].content.append(ContentItem(text='\n\n' + tool_system))
-        else:
-            messages = [Message(role=SYSTEM, content=[ContentItem(text=tool_system)])] + messages
+        if vlm_module.get_vlm_key() == 'qwen':
+            tool_descs = [{'type': 'function', 'function': f} for f in functions]
+            tool_descs = '\n'.join([json.dumps(f, ensure_ascii=False) for f in tool_descs])
+            tool_system = FN_CALL_TEMPLATE_QWEN.format(tool_descs=tool_descs)
+            if messages[0].role == SYSTEM:
+                messages[0].content.append(ContentItem(text='\n\n' + tool_system))
+            else:
+                messages = [Message(role=SYSTEM, content=[ContentItem(text=tool_system)])] + messages
+        elif vlm_module.get_vlm_key() == 'gemma':
+            tool_descs = json.dumps([function.pop("name_for_human").pop("args_format") for function in functions], ensure_ascii=False)
+            tool_system = FN_CALL_TEMPLATE_GEMA.format(tool_descs=tool_descs)
+            if messages[0].role == SYSTEM:
+                messages[0].content.append(ContentItem(text='\n\n' + tool_system))
+            else:
+                messages = [Message(role=SYSTEM, content=[ContentItem(text=tool_system)])] + messages
         return messages
 
     @staticmethod
@@ -163,7 +171,7 @@ class NousFnCallPrompt(BaseFnCallPrompt):
         return new_messages
 
 
-FN_CALL_TEMPLATE = """# Tools
+FN_CALL_TEMPLATE_QWEN = """# Tools
 
 You may call one or more functions to assist with the user query.
 
@@ -176,6 +184,13 @@ For each function call, return a json object with function name and arguments wi
 <tool_call>
 {{"name": <function-name>, "arguments": <args-json-object>}}
 </tool_call>"""
+FN_CALL_TEMPLATE_GEMA = """You have access to functions. If you decide to invoke any of the function(s),
+you MUST put it in the format of
+{{"name": function name, "parameters": dictionary of argument name and its value}}
+
+You SHOULD NOT include any other text in the response if you call a function
+{tool_descs}
+"""
 
 
 # Mainly for removing incomplete special tokens when streaming the output
