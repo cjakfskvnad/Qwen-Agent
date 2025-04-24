@@ -65,7 +65,7 @@ class NousFnCallPrompt(BaseFnCallPrompt):
             else:
                 messages = [Message(role=SYSTEM, content=[ContentItem(text=tool_system)])] + messages
         elif vlm_module.get_vlm_key() == 'gemma':
-            tool_descs = json.dumps([function.pop("name_for_human").pop("args_format") for function in functions], ensure_ascii=False)
+            tool_descs = json.dumps(functions, ensure_ascii=False)
             tool_system = FN_CALL_TEMPLATE_GEMA.format(tool_descs=tool_descs)
             if messages[0].role == SYSTEM:
                 messages[0].content.append(ContentItem(text='\n\n' + tool_system))

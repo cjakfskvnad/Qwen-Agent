@@ -10,7 +10,7 @@ from qwen_agent.utils.utils import has_chinese_chars, json_loads, logger, print_
 TOOL_REGISTRY = {}
 
 
-def register_tool(name, allow_overwrite=False):
+def register_tool(name, allow_overwrite=True):
 
     def decorator(cls):
         if name in TOOL_REGISTRY:
